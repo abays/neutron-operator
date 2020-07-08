@@ -294,6 +294,14 @@ func newDaemonset(cr *neutronv1.NeutronOvsAgent, cmName string, configHash strin
 					HostAliases:    ospHostAliases,
 					InitContainers: []corev1.Container{},
 					Containers:     []corev1.Container{},
+					Tolerations: []corev1.Toleration{
+						corev1.Toleration{
+							Key:      "dedicated",
+							Operator: corev1.TolerationOpEqual,
+							Value:    "worker-osp",
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},

@@ -8,14 +8,25 @@ import (
 )
 
 type neutronSriovAgentConfigOptions struct {
-	RabbitTransportURL string
-	Debug              string
+	RabbitTransportURL     string
+	Debug                  string
+	PhysicalDeviceMappings string
 }
 
 // ConfigMap - custom config map
-func ConfigMap(cr *neutronv1.NeutronSriovAgent, cmName string) *corev1.ConfigMap {
+func ConfigMap(cr *neutronv1.NeutronSriovAgent, cmName string, sriovConfigMap *corev1.ConfigMap) *corev1.ConfigMap {
+
+	physDevMappings := ""
+
+	if sriovConfigMap != nil && len((*sriovConfigMap).Data) != 0 {
+		if value, ok := sriovConfigMap.Data["physicalDeviceMappings"]; ok {
+			physDevMappings = value
+		}
+	}
+
 	opts := neutronSriovAgentConfigOptions{cr.Spec.RabbitTransportURL,
-		cr.Spec.Debug}
+		cr.Spec.Debug,
+		physDevMappings}
 
 	cm := &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -28,7 +39,7 @@ func ConfigMap(cr *neutronv1.NeutronSriovAgent, cmName string) *corev1.ConfigMap
 		},
 		Data: map[string]string{
 			"neutron.conf":    util.ExecuteTemplateFile("neutron.conf", &opts),
-			"sriov_agent.ini": util.ExecuteTemplateFile("sriov_agent.ini", nil),
+			"sriov_agent.ini": util.ExecuteTemplateFile("sriov_agent.ini", &opts),
 		},
 	}
 
