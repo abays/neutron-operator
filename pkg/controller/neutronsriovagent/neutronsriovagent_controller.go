@@ -31,6 +31,8 @@ var ospHostAliases = []corev1.HostAlias{}
 // CommonConfigMAP
 const (
 	CommonConfigMAP string = "common-config"
+	// HACK: config map name with SRIOV config
+	sriovConfigMapName = "sriov-config"
 )
 
 // Add creates a new NeutronSriovAgent Controller and adds it to the Manager. The Manager will set fields on the Controller
@@ -138,6 +140,17 @@ func (r *ReconcileNeutronSriovAgent) Reconcile(request reconcile.Request) (recon
 		return reconcile.Result{}, err
 	}
 
+	// Check for an SRIOV config map
+	sriovConfigMap := &corev1.ConfigMap{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: sriovConfigMapName, Namespace: instance.Namespace}, sriovConfigMap)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("SRIOV config map not found")
+	} else {
+		if err := controllerutil.SetControllerReference(instance, sriovConfigMap, r.scheme); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	// Create additional host entries added to the /etc/hosts file of the containers
 	ospHostAliases, err = util.CreateOspHostsEntries(commonConfigMap)
 	if err != nil {
@@ -146,7 +159,7 @@ func (r *ReconcileNeutronSriovAgent) Reconcile(request reconcile.Request) (recon
 	}
 
 	// ConfigMap
-	configMap := neutronsriovagent.ConfigMap(instance, instance.Name)
+	configMap := neutronsriovagent.ConfigMap(instance, instance.Name, sriovConfigMap)
 	if err := controllerutil.SetControllerReference(instance, configMap, r.scheme); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -268,6 +281,14 @@ func newDaemonset(cr *neutronv1.NeutronSriovAgent, cmName string, configHash str
 					HostAliases:    ospHostAliases,
 					InitContainers: []corev1.Container{},
 					Containers:     []corev1.Container{},
+					Tolerations: []corev1.Toleration{
+						corev1.Toleration{
+							Key:      "dedicated",
+							Operator: corev1.TolerationOpEqual,
+							Value:    "worker-osp",
+							Effect:   corev1.TaintEffectNoSchedule,
+						},
+					},
 				},
 			},
 		},
@@ -335,7 +356,7 @@ func newDaemonset(cr *neutronv1.NeutronSriovAgent, cmName string, configHash str
 		//        TimeoutSeconds:      1,
 		//},
 		Command: []string{
-			"/bin/sleep", "86400",
+			"/usr/bin/neutron-sriov-nic-agent", "--config-file", "/etc/neutron/neutron.conf", "--config-file", "/etc/neutron/plugins/ml2/sriov_agent.ini",
 		},
 		SecurityContext: &corev1.SecurityContext{
 			Privileged: &trueVar,
@@ -358,6 +379,12 @@ func newDaemonset(cr *neutronv1.NeutronSriovAgent, cmName string, configHash str
 				ReadOnly:  true,
 				MountPath: "/etc/neutron/plugins/ml2/openvswitch_agent.ini",
 				SubPath:   "openvswitch_agent.ini",
+			},
+			{
+				Name:      cmName,
+				ReadOnly:  true,
+				MountPath: "/etc/neutron/plugins/ml2/sriov_agent.ini",
+				SubPath:   "sriov_agent.ini",
 			},
 			{
 				Name:      "etc-machine-id",
