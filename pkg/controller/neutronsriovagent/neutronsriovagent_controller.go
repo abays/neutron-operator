@@ -274,13 +274,14 @@ func newDaemonset(cr *neutronv1.NeutronSriovAgent, cmName string, configHash str
 					Labels: map[string]string{"daemonset": cr.Name + "-daemonset"},
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:   map[string]string{"daemon": cr.Spec.Label},
-					HostNetwork:    true,
-					HostPID:        true,
-					DNSPolicy:      "ClusterFirstWithHostNet",
-					HostAliases:    ospHostAliases,
-					InitContainers: []corev1.Container{},
-					Containers:     []corev1.Container{},
+					NodeSelector:       map[string]string{"daemon": cr.Spec.Label},
+					HostNetwork:        true,
+					HostPID:            true,
+					DNSPolicy:          "ClusterFirstWithHostNet",
+					HostAliases:        ospHostAliases,
+					InitContainers:     []corev1.Container{},
+					Containers:         []corev1.Container{},
+					ServiceAccountName: "neutron-operator",
 					Tolerations: []corev1.Toleration{
 						corev1.Toleration{
 							Key:      "dedicated",
