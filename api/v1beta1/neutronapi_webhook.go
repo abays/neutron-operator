@@ -26,13 +26,8 @@ import (
 	"fmt"
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // NeutronAPIDefaults -
@@ -52,24 +47,6 @@ func SetupNeutronAPIDefaults(defaults NeutronAPIDefaults) {
 	neutronapilog.Info("NeutronAPI defaults initialized", "defaults", defaults)
 }
 
-// SetupWebhookWithManager sets up the webhook with the Manager
-func (r *NeutronAPI) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
-
-//+kubebuilder:webhook:path=/mutate-neutron-openstack-org-v1beta1-neutronapi,mutating=true,failurePolicy=fail,sideEffects=None,groups=neutron.openstack.org,resources=neutronapis,verbs=create;update,versions=v1beta1,name=mneutronapi.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Defaulter = &NeutronAPI{}
-
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *NeutronAPI) Default() {
-	neutronapilog.Info("default", "name", r.Name)
-
-	r.Spec.Default()
-}
-
 // Default - set defaults for this NeutronAPI spec
 func (spec *NeutronAPISpec) Default() {
 	// only container image validations go here
@@ -86,28 +63,6 @@ func (spec *NeutronAPISpecCore) Default() {
 	}
 }
 
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-neutron-openstack-org-v1beta1-neutronapi,mutating=false,failurePolicy=fail,sideEffects=None,groups=neutron.openstack.org,resources=neutronapis,verbs=create;update,versions=v1beta1,name=vneutronapi.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Validator = &NeutronAPI{}
-
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *NeutronAPI) ValidateCreate() (admission.Warnings, error) {
-	neutronapilog.Info("validate create", "name", r.Name)
-
-	allErrs := field.ErrorList{}
-	basePath := field.NewPath("spec")
-
-	if err := r.Spec.ValidateCreate(basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
-
-	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(GroupVersion.WithKind("NeutronAPI").GroupKind(), r.Name, allErrs)
-	}
-
-	return nil, nil
-}
 
 // ValidateCreate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an NeutronAPI spec.
@@ -130,28 +85,6 @@ func (r *NeutronAPISpecCore) ValidateCreate(basePath *field.Path, namespace stri
 	return allErrs
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *NeutronAPI) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	neutronapilog.Info("validate update", "name", r.Name)
-
-	oldNeutronAPI, ok := old.(*NeutronAPI)
-	if !ok || oldNeutronAPI == nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
-	}
-
-	allErrs := field.ErrorList{}
-	basePath := field.NewPath("spec")
-
-	if err := r.Spec.ValidateUpdate(oldNeutronAPI.Spec, basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
-
-	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(GroupVersion.WithKind("NeutronAPI").GroupKind(), r.Name, allErrs)
-	}
-
-	return nil, nil
-}
 
 // ValidateUpdate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an neutron spec.
@@ -174,13 +107,6 @@ func (spec *NeutronAPISpecCore) ValidateUpdate(old NeutronAPISpecCore, basePath 
 	return allErrs
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *NeutronAPI) ValidateDelete() (admission.Warnings, error) {
-	neutronapilog.Info("validate delete", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object deletion.
-	return nil, nil
-}
 
 func (spec *NeutronAPISpec) GetDefaultRouteAnnotations() (annotations map[string]string) {
 	return spec.NeutronAPISpecCore.GetDefaultRouteAnnotations()
